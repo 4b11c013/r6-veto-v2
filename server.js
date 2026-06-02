@@ -18,10 +18,8 @@ app.use(express.static(path.join(__dirname, 'public'), {
 app.use(express.static(__dirname));
 app.use('/maps', express.static(__dirname));
 
-// BO3 veto: T1ban T2ban T1ban T2ban T1pick T2pick → decider
+// BO3 veto: T1ban T2ban T1pick T2pick -> wait for G2 result -> G3 pick -> done
 const VETO = [
-  {action:'ban',  team:'team1'},
-  {action:'ban',  team:'team2'},
   {action:'ban',  team:'team1'},
   {action:'ban',  team:'team2'},
   {action:'pick', team:'team1'},
@@ -47,6 +45,8 @@ function reset() {
     sideBy: null,         // who must pick side (team1/team2)
     sideGame: null,       // 1, 2, or 3
     games: [],            // [{game, mapId, name, sideBy, side}]
+    g2Winner: null,       // team1 or team2
+    dynamicVeto: [...VETO] // copy of VETO, can add 3rd map pick
   };
 }
 reset();
@@ -59,12 +59,13 @@ io.on('connection', sock => {
     S.team1.name = t1 || 'TEAM 1';
     S.team2.name = t2 || 'TEAM 2';
     S.phase = 'veto';
+    S.dynamicVeto = [...VETO];
     io.emit('state', S);
   });
 
   sock.on('act', mapId => {
     if (S.phase !== 'veto') return;
-    const step = VETO[S.step];
+    const step = S.dynamicVeto[S.step];
     if (!step) return;
     const map = S.maps.find(m => m.id === mapId && m.status === 'available');
     if (!map) return;
@@ -75,16 +76,16 @@ io.on('connection', sock => {
       map.status = 'banned';
       S[step.team].bans.push(mapId);
       S.step++;
-      // check if veto done
-      if (S.step >= VETO.length) finishVeto();
+      // check if veto done (shouldn't happen directly on ban now)
+      if (S.step >= S.dynamicVeto.length) S.phase = 'done';
     } else {
       // pick
       map.status = 'picked';
-      S[step.team].pick = mapId;
-      const gameNum = step.team === 'team1' ? 1 : 2;
+      S[step.team].pick = mapId; // note: for G3, this will just overwrite or we don't strictly use S.team.pick for display if we have games array
+      const gameNum = S.games.length + 1;
       S.games.push({ game: gameNum, mapId, name: map.name, sideBy: null, side: null });
       S.step++;
-      // other team selects side
+      
       const other = step.team === 'team1' ? 'team2' : 'team1';
       S.phase = 'side';
       S.sideBy = other;
@@ -98,41 +99,46 @@ io.on('connection', sock => {
     const g = S.games.find(x => x.game === S.sideGame);
     if (g) { g.sideBy = S.sideBy; g.side = side; }
 
-    const nextStep = VETO[S.step];
-    if (nextStep) {
+    if (S.step < S.dynamicVeto.length) {
       S.phase = 'veto';
-      S.sideBy = null;
-      S.sideGame = null;
     } else {
-      finishVeto();
+      // If we finished the first 4 steps, wait for G2 result
+      if (S.games.length === 2) {
+        S.phase = 'g2_result';
+      } else {
+        S.phase = 'done';
+      }
     }
+    S.sideBy = null;
+    S.sideGame = null;
     io.emit('state', S);
   });
 
-  sock.on('sideDecider', side => {
-    if (S.phase !== 'side' || S.sideGame !== 3) return;
-    const g = S.games.find(x => x.game === 3);
-    if (g) { g.sideBy = S.sideBy; g.side = side; }
-    S.phase = 'done';
-    S.sideBy = null;
+  sock.on('g2Result', winner => {
+    if (S.phase !== 'g2_result') return;
+    S.g2Winner = winner;
+    S.phase = 'g3_choice';
+    io.emit('state', S);
+  });
+
+  sock.on('g3Choice', choice => {
+    // choice is 'map' or 'side'
+    if (S.phase !== 'g3_choice') return;
+    const otherTeam = S.g2Winner === 'team1' ? 'team2' : 'team1';
+    
+    if (choice === 'map') {
+      // Winner picks map, other picks side
+      S.dynamicVeto.push({ action: 'pick', team: S.g2Winner });
+    } else {
+      // Winner picks side, meaning other picks map
+      S.dynamicVeto.push({ action: 'pick', team: otherTeam });
+    }
+    S.phase = 'veto';
     io.emit('state', S);
   });
 
   sock.on('reset', () => { reset(); io.emit('state', S); });
 });
-
-function finishVeto() {
-  const remaining = S.maps.filter(m => m.status === 'available');
-  if (remaining[0]) {
-    remaining[0].status = 'decider';
-    S.decider = remaining[0].id;
-    S.games.push({ game:3, mapId: remaining[0].id, name: remaining[0].name, sideBy:null, side:null });
-  }
-  // team1 chooses side for decider
-  S.phase = 'side';
-  S.sideBy = 'team1';
-  S.sideGame = 3;
-}
 
 server.listen(PORT, () => {
   console.log(`\n🎮 R6 Map Veto: http://localhost:${PORT}\n`);
