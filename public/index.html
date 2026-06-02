@@ -143,6 +143,24 @@ body.game{display:grid;grid-template-rows:70px 26px 1fr 90px;overflow:hidden}
   </div>
 </div>
 
+<!-- G2 RESULT OVERLAY -->
+<div id="g2ResultOverlay" class="hidden" style="position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center">
+  <div class="side-box">
+    <h2>🏆 第二局結束</h2>
+    <p>請問是哪一隊贏下第二局？</p>
+    <div class="side-row" id="g2WinnerBtns"></div>
+  </div>
+</div>
+
+<!-- G3 CHOICE OVERLAY -->
+<div id="g3ChoiceOverlay" class="hidden" style="position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center">
+  <div class="side-box">
+    <h2>🎯 決勝局選擇權</h2>
+    <p id="g3Prompt"></p>
+    <div class="side-row" id="g3ChoiceBtns"></div>
+  </div>
+</div>
+
 <!-- DONE OVERLAY -->
 <div class="screen hidden" id="doneScreen">
   <div class="logo" style="font-size:2rem">BO3 賽程</div>
@@ -189,12 +207,6 @@ body.game{display:grid;grid-template-rows:70px 26px 1fr 90px;overflow:hidden}
 const socket = io();
 let myRole = null;
 let S = null;
-
-const VETO = [
-  {action:'ban',team:'team1'},{action:'ban',team:'team2'},
-  {action:'ban',team:'team1'},{action:'ban',team:'team2'},
-  {action:'pick',team:'team1'},{action:'pick',team:'team2'},
-];
 
 function pickRole(r) {
   myRole = r;
@@ -248,12 +260,16 @@ function render(s) {
     else { show('waitScreen',true); show('setupScreen',false); }
     show('doneScreen',false);
     show('sideOverlay',false);
+    show('g2ResultOverlay',false);
+    show('g3ChoiceOverlay',false);
     return;
   }
   if (s.phase === 'done') {
     hideGame();
     show('doneScreen',true);
     show('sideOverlay',false);
+    show('g2ResultOverlay',false);
+    show('g3ChoiceOverlay',false);
     renderResults(s);
     return;
   }
@@ -265,23 +281,27 @@ function render(s) {
   document.getElementById('t1hdr').textContent = s.team1.name;
   document.getElementById('t2hdr').textContent = s.team2.name;
 
-  // Highlight active team header
-  const step = VETO[s.step];
-  document.getElementById('t1hdr').className = 'team-hdr' + (step && step.team==='team1' && s.phase==='veto' ? ' active-turn' : '');
-  document.getElementById('t2hdr').className = 'team-hdr right' + (step && step.team==='team2' && s.phase==='veto' ? ' active-turn' : '');
-
   // Status
   let statusTxt = '等待中...';
+  const step = s.dynamicVeto[s.step];
   if (s.phase === 'veto' && step) {
     const tname = s[step.team].name;
     statusTxt = `${tname} 正在 ${step.action==='ban'?'禁用':'選擇'} 地圖`;
     if (myRole === step.team) statusTxt = '👆 ' + statusTxt + ' (請點選)';
   } else if (s.phase === 'side') {
     statusTxt = s[s.sideBy].name + ' 正在選擇攻守方 (第' + s.sideGame + '局)';
+  } else if (s.phase === 'g2_result') {
+    statusTxt = '等待確認第二局獲勝隊伍...';
+  } else if (s.phase === 'g3_choice') {
+    statusTxt = s[s.g2Winner].name + ' 正在決定第三局優勢...';
   }
   document.getElementById('statusPill').textContent = statusTxt;
 
-  // Side overlay
+  // Overlays
+  show('sideOverlay', s.phase === 'side');
+  show('g2ResultOverlay', s.phase === 'g2_result');
+  show('g3ChoiceOverlay', s.phase === 'g3_choice');
+
   if (s.phase === 'side') {
     const g = s.games.find(x => x.game === s.sideGame);
     document.getElementById('sideMapName').textContent = g ? g.name : '';
@@ -290,11 +310,27 @@ function render(s) {
     if (myRole === s.sideBy) {
       btns.innerHTML = `<button class="sbtn atk2" onclick="chooseSide('attack')">先攻</button><button class="sbtn def2" onclick="chooseSide('defense')">先守</button>`;
     } else {
-      btns.innerHTML = `<p style="color:rgba(255,255,255,.4);font-family:'Noto Sans TC',sans-serif;font-size:.85rem">等待對方選擇...</p>`;
+      btns.innerHTML = `<p style="color:rgba(255,255,255,.4);font-size:.85rem">等待對方選擇...</p>`;
     }
-    show('sideOverlay', true);
-  } else {
-    show('sideOverlay', false);
+  }
+
+  if (s.phase === 'g2_result') {
+    const btns = document.getElementById('g2WinnerBtns');
+    if (myRole === 'team1' || myRole === 'team2') {
+      btns.innerHTML = `<button class="sbtn atk2" style="background:rgba(201,162,39,.2);border-color:#c9a227;color:#c9a227" onclick="socket.emit('g2Result','team1')">${s.team1.name}</button><button class="sbtn def2" style="background:rgba(201,162,39,.2);border-color:#c9a227;color:#c9a227" onclick="socket.emit('g2Result','team2')">${s.team2.name}</button>`;
+    } else {
+      btns.innerHTML = `<p style="color:rgba(255,255,255,.4);font-size:.85rem">等待雙方代表確認...</p>`;
+    }
+  }
+
+  if (s.phase === 'g3_choice') {
+    document.getElementById('g3Prompt').textContent = s[s.g2Winner].name + ' 請決定：你要自己選圖，還是把選圖權給對方，由你選攻守？';
+    const btns = document.getElementById('g3ChoiceBtns');
+    if (myRole === s.g2Winner) {
+      btns.innerHTML = `<button class="sbtn atk2" style="background:#c9a227;color:#000;border:none" onclick="socket.emit('g3Choice','map')">我們要選地圖</button><button class="sbtn def2" style="background:#4ade80;color:#000;border:none" onclick="socket.emit('g3Choice','side')">我們要選攻守</button>`;
+    } else {
+      btns.innerHTML = `<p style="color:rgba(255,255,255,.4);font-size:.85rem">等待對方選擇...</p>`;
+    }
   }
 
   // Bans
@@ -316,7 +352,8 @@ function renderBans(s) {
     const el = document.getElementById(t === 'team1' ? 't1bans' : 't2bans');
     el.innerHTML = '';
     const bans = s[t].bans || [];
-    for (let i = 0; i < 2; i++) {
+    // Only 1 ban per team now
+    for (let i = 0; i < 1; i++) {
       const mid = bans[i];
       if (mid) {
         const m = s.maps.find(x => x.id === mid);
@@ -347,7 +384,7 @@ function renderPicks(s) {
 
 function renderGrid(s) {
   const grid = document.getElementById('mapGrid');
-  const step = VETO[s.step];
+  const step = s.dynamicVeto[s.step];
   const canAct = s.phase === 'veto' && step && step.team === myRole;
   grid.innerHTML = '';
   s.maps.forEach(m => {
