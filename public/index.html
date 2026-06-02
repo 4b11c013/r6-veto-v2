@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>R6 MAP VETO - BO3</title>
+<script src="/socket.io/socket.io.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@700;900&family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100vh;overflow:hidden;background:#08080f;color:#fff;font-family:'Rajdhani',sans-serif}
+.hidden{display:none!important}
+/* Overlay screens */
+.screen{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;background:rgba(8,8,15,.97)}
+.logo{font-size:3rem;font-weight:900;letter-spacing:10px;background:linear-gradient(180deg,#fff 20%,#c9a227);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.sub{font-size:.75rem;letter-spacing:6px;color:#c9a227}
+.btn{cursor:pointer;border:1px solid rgba(201,162,39,.5);background:rgba(201,162,39,.1);color:#fff;padding:12px 32px;border-radius:4px;font-family:'Rajdhani',sans-serif;font-size:1.1rem;font-weight:700;letter-spacing:3px;text-transform:uppercase;transition:all .2s}
+.btn:hover{background:rgba(201,162,39,.25);border-color:#c9a227}
+.btn.gold{background:linear-gradient(135deg,#c9a227,#e8c84a);color:#000;border:none}
+.btn.red{background:rgba(220,50,50,.2);border-color:rgba(220,50,50,.5);color:#f87171}
+.btn.blue{background:rgba(50,150,255,.2);border-color:rgba(50,150,255,.5);color:#60a5fa}
+.row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+input{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.2);color:#fff;padding:10px 16px;border-radius:4px;font-size:1rem;font-family:'Noto Sans TC',sans-serif;width:200px}
+input:focus{outline:none;border-color:#c9a227}
+label{font-size:.75rem;letter-spacing:2px;color:rgba(255,255,255,.5);display:block;margin-bottom:4px}
+.field{display:flex;flex-direction:column}
+/* Main layout */
+body.game{display:grid;grid-template-rows:70px 26px 1fr 90px;overflow:hidden}
+.hdr{position:relative;z-index:2;text-align:center;display:flex;flex-direction:column;justify-content:center}
+.hdr-t{font-size:clamp(1.5rem,3.5vw,2.6rem);font-weight:900;letter-spacing:10px;background:linear-gradient(180deg,#fff 20%,#c9a227);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hdr-s{font-size:.65rem;letter-spacing:5px;color:#c9a227;margin-top:2px}
+.status-bar{position:relative;z-index:2;display:flex;align-items:center;justify-content:center}
+.status-pill{padding:3px 22px;background:rgba(201,162,39,.1);border:1px solid rgba(201,162,39,.25);border-radius:20px;color:#c9a227;font-size:.7rem;letter-spacing:3px;font-family:'Noto Sans TC',sans-serif}
+/* Main area: team col | maps | team col */
+.main{position:relative;z-index:2;display:grid;grid-template-columns:200px 1fr 200px;gap:8px;padding:6px 12px;min-height:0;overflow:hidden}
+/* Team side panels */
+.team-col{display:flex;flex-direction:column;gap:6px;min-height:0}
+.team-hdr{padding:8px 12px;background:linear-gradient(135deg,rgba(201,162,39,.12),rgba(201,162,39,.03));border:1px solid rgba(201,162,39,.28);border-radius:5px;font-size:1rem;font-weight:700;letter-spacing:3px;text-transform:uppercase}
+.team-hdr.right{text-align:right}
+.side-lbl{font-size:.52rem;letter-spacing:4px;color:rgba(255,255,255,.3);text-transform:uppercase;margin-top:4px}
+.ban-list{display:flex;flex-direction:column;gap:4px}
+.map-mini{position:relative;height:50px;border-radius:4px;overflow:hidden;background:#111;border:1px solid rgba(255,255,255,.08)}
+.map-mini img{width:100%;height:100%;object-fit:cover;filter:brightness(.7)}
+.map-mini .mn{position:absolute;bottom:0;left:0;right:0;padding:2px 6px;background:linear-gradient(transparent,rgba(0,0,0,.9));font-size:.58rem;font-family:'Noto Sans TC',sans-serif}
+.map-mini.banned img{filter:brightness(.2) saturate(.1)}
+.map-mini.banned::after{content:'✕';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:900;color:rgba(230,50,50,.95)}
+.pick-card{flex:1;position:relative;border-radius:5px;overflow:hidden;background:#111;border:2px solid rgba(201,162,39,.2);min-height:60px}
+.pick-card img{width:100%;height:100%;object-fit:cover;filter:brightness(.75)}
+.pick-card .pn{position:absolute;bottom:0;left:0;right:0;padding:5px 8px;background:linear-gradient(transparent,rgba(0,0,0,.9));font-size:.72rem;font-family:'Noto Sans TC',sans-serif;letter-spacing:1px}
+.pick-card.empty{border-style:dashed;border-color:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center}
+.pick-card.empty::after{content:'等待選圖';color:rgba(255,255,255,.15);font-size:.65rem;font-family:'Noto Sans TC',sans-serif}
+.side-tag{position:absolute;top:6px;right:6px;padding:2px 8px;border-radius:3px;font-size:.6rem;font-weight:700;letter-spacing:2px}
+.atk{background:rgba(255,80,40,.3);border:1px solid #ff5028;color:#ff6040}
+.def{background:rgba(40,140,255,.3);border:1px solid #288cff;color:#50a0ff}
+/* Map grid */
+.map-grid-wrap{display:flex;flex-direction:column;gap:6px;min-height:0;overflow:hidden}
+.map-grid{display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(2,1fr);gap:6px;flex:1;min-height:0}
+.mc{position:relative;border-radius:5px;overflow:hidden;background:#111;border:1px solid rgba(255,255,255,.12);cursor:default;transition:all .2s}
+.mc img{width:100%;height:100%;object-fit:cover;filter:brightness(.7);transition:filter .2s}
+.mc .mn{position:absolute;bottom:0;left:0;right:0;padding:4px 8px;background:linear-gradient(transparent,rgba(0,0,0,.9));font-size:.7rem;font-family:'Noto Sans TC',sans-serif;letter-spacing:1px}
+.mc.clickable{cursor:pointer;border-color:rgba(201,162,39,.5)}
+.mc.clickable:hover img{filter:brightness(1)}
+.mc.clickable:hover{border-color:#c9a227;transform:scale(1.02)}
+.mc.ban-action{border-color:rgba(220,50,50,.5)!important}
+.mc.pick-action{border-color:rgba(50,220,100,.5)!important}
+.mc.banned{cursor:not-allowed}
+.mc.banned img{filter:brightness(.2) saturate(.1)}
+.mc.banned::after{content:'✕';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:2.5rem;font-weight:900;color:rgba(220,50,50,.9);pointer-events:none}
+.mc.picked{cursor:not-allowed;border-color:rgba(201,162,39,.7)!important}
+.mc.picked::before{content:'PICKED';position:absolute;top:6px;left:6px;background:#c9a227;color:#000;padding:2px 7px;font-size:.55rem;letter-spacing:2px;border-radius:2px;font-weight:700;z-index:2}
+.mc.decider{cursor:not-allowed;border-color:rgba(80,200,255,.7)!important}
+.mc.decider::before{content:'DECIDER';position:absolute;top:6px;left:6px;background:rgba(80,200,255,.9);color:#000;padding:2px 7px;font-size:.55rem;letter-spacing:2px;border-radius:2px;font-weight:700;z-index:2}
+/* Pool bottom */
+.pool{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;padding:4px 12px 6px;gap:4px}
+.pool-lbl{font-size:.52rem;letter-spacing:5px;color:rgba(255,255,255,.25);text-transform:uppercase}
+.pool-row{display:flex;gap:5px}
+.pm{position:relative;width:80px;height:50px;border-radius:3px;overflow:hidden;flex-shrink:0}
+.pm img{width:100%;height:100%;object-fit:cover}
+.pm .pn2{position:absolute;bottom:0;left:0;right:0;padding:2px 4px;background:linear-gradient(transparent,rgba(0,0,0,.9));font-size:.5rem;text-align:center;font-family:'Noto Sans TC',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pm.av{border:1px solid rgba(255,255,255,.15)}
+.pm.bn{border:1px solid rgba(200,50,50,.2);opacity:.35}
+.pm.bn img{filter:brightness(.2) saturate(0)}
+.pm.pk{border:2px solid rgba(201,162,39,.7)}
+.pm.dc{border:2px solid rgba(80,200,255,.7)}
+/* Side select overlay */
+#sideOverlay{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center}
+.side-box{background:#10101a;border:2px solid rgba(201,162,39,.4);border-radius:8px;padding:30px 50px;text-align:center;max-width:440px}
+.side-box h2{font-size:1.1rem;letter-spacing:5px;color:#c9a227;margin-bottom:8px}
+.side-box .map-name{font-size:1.6rem;font-weight:700;letter-spacing:2px;margin:10px 0}
+.side-box p{font-size:.8rem;color:rgba(255,255,255,.5);letter-spacing:2px;font-family:'Noto Sans TC',sans-serif;margin-bottom:16px}
+.side-row{display:flex;gap:16px;justify-content:center}
+.sbtn{cursor:pointer;padding:12px 30px;border-radius:4px;font-size:1rem;font-weight:700;letter-spacing:3px;text-transform:uppercase;transition:all .2s}
+.sbtn.atk2{background:rgba(255,80,40,.2);border:2px solid #ff5028;color:#ff6040}
+.sbtn.atk2:hover{background:rgba(255,80,40,.4)}
+.sbtn.def2{background:rgba(40,140,255,.2);border:2px solid #288cff;color:#50a0ff}
+.sbtn.def2:hover{background:rgba(40,140,255,.4)}
+/* BG */
+.bg{position:fixed;inset:0;background:radial-gradient(ellipse 100% 55% at 50% -5%,#1e1a09,#08080f 55%);z-index:0;pointer-events:none}
+.line-t{position:fixed;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#c9a227 30%,#f0d060 50%,#c9a227 70%,transparent);z-index:50}
+.line-b{position:fixed;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#c9a227 30%,#f0d060 50%,#c9a227 70%,transparent);z-index:50}
+.active-turn{box-shadow:0 0 0 2px #c9a227,0 0 20px rgba(201,162,39,.3)!important}
+</style>
+</head>
+<body>
+<div class="bg"></div><div class="line-t"></div><div class="line-b"></div>
+
+<!-- ROLE SCREEN -->
+<div class="screen" id="roleScreen">
+  <div class="logo">MAP VETO</div>
+  <div class="sub">Rainbow Six Siege · BO3</div>
+  <div class="row" style="margin-top:10px">
+    <button class="btn red" onclick="pickRole('team1')">🔴 隊伍 1 代表</button>
+    <button class="btn blue" onclick="pickRole('team2')">🔵 隊伍 2 代表</button>
+    <button class="btn" onclick="pickRole('viewer')">👁 觀看</button>
+  </div>
+</div>
+
+<!-- SETUP SCREEN (team1 rep only) -->
+<div class="screen hidden" id="setupScreen">
+  <div class="logo">MAP VETO</div>
+  <div class="sub">設置隊伍名稱</div>
+  <div class="row">
+    <div class="field"><label>隊伍 1 名稱</label><input id="t1name" value="TEAM 1"></div>
+    <div class="field"><label>隊伍 2 名稱</label><input id="t2name" value="TEAM 2"></div>
+  </div>
+  <button class="btn gold" onclick="startGame()">🚀 開始比賽</button>
+</div>
+
+<!-- WAITING SCREEN -->
+<div class="screen hidden" id="waitScreen">
+  <div class="logo">MAP VETO</div>
+  <div class="sub">等待比賽開始...</div>
+  <p style="color:rgba(255,255,255,.3);font-size:.8rem;font-family:'Noto Sans TC',sans-serif">等待隊伍1代表設置並開始</p>
+</div>
+
+<!-- SIDE SELECT OVERLAY -->
+<div id="sideOverlay" class="hidden">
+  <div class="side-box">
+    <h2>⚔️ 選擇攻守方</h2>
+    <div class="map-name" id="sideMapName"></div>
+    <p id="sidePrompt"></p>
+    <div class="side-row" id="sideBtns"></div>
+  </div>
+</div>
+
+<!-- DONE OVERLAY -->
+<div class="screen hidden" id="doneScreen">
+  <div class="logo" style="font-size:2rem">BO3 賽程</div>
+  <div id="resultsBox" style="display:flex;flex-direction:column;gap:12px;text-align:center;font-family:'Noto Sans TC',sans-serif"></div>
+  <button class="btn red" onclick="socket.emit('reset')">🔄 重置</button>
+</div>
+
+<!-- GAME SCREEN -->
+<div class="hdr hidden" id="gameHdr">
+  <div class="hdr-t">MAP VETO</div>
+  <div class="hdr-s" id="hdrVs"></div>
+</div>
+<div class="status-bar hidden" id="statusBar">
+  <div class="status-pill" id="statusPill">等待中...</div>
+</div>
+<div class="main hidden" id="mainArea">
+  <!-- Team 1 left -->
+  <div class="team-col">
+    <div class="team-hdr" id="t1hdr">TEAM 1</div>
+    <div class="side-lbl">禁用地圖</div>
+    <div class="ban-list" id="t1bans"></div>
+    <div class="side-lbl" style="margin-top:4px">選擇地圖</div>
+    <div class="pick-card empty" id="t1pick"></div>
+  </div>
+  <!-- Map grid center -->
+  <div class="map-grid-wrap">
+    <div class="map-grid" id="mapGrid"></div>
+  </div>
+  <!-- Team 2 right -->
+  <div class="team-col">
+    <div class="team-hdr right" id="t2hdr">TEAM 2</div>
+    <div class="side-lbl" style="text-align:right">禁用地圖</div>
+    <div class="ban-list" id="t2bans"></div>
+    <div class="side-lbl" style="text-align:right;margin-top:4px">選擇地圖</div>
+    <div class="pick-card empty" id="t2pick"></div>
+  </div>
+</div>
+<div class="pool hidden" id="poolArea">
+  <div class="pool-lbl">地圖池 MAP POOL</div>
+  <div class="pool-row" id="poolRow"></div>
+</div>
+
+<script>
+const socket = io();
+let myRole = null;
+let S = null;
+
+const VETO = [
+  {action:'ban',team:'team1'},{action:'ban',team:'team2'},
+  {action:'ban',team:'team1'},{action:'ban',team:'team2'},
+  {action:'pick',team:'team1'},{action:'pick',team:'team2'},
+];
+
+function pickRole(r) {
+  myRole = r;
+  show('roleScreen', false);
+  if (r === 'team1') {
+    if (S && S.phase !== 'setup') { showGame(); }
+    else show('setupScreen', true);
+  } else if (r === 'team2') {
+    if (S && S.phase !== 'setup') showGame();
+    else show('waitScreen', true);
+  } else {
+    if (S && S.phase !== 'setup') showGame();
+    else show('waitScreen', true);
+  }
+}
+
+function show(id, visible) {
+  const el = document.getElementById(id);
+  if (visible) el.classList.remove('hidden');
+  else el.classList.add('hidden');
+}
+
+function startGame() {
+  socket.emit('start', {
+    t1: document.getElementById('t1name').value.trim() || 'TEAM 1',
+    t2: document.getElementById('t2name').value.trim() || 'TEAM 2'
+  });
+}
+
+function showGame() {
+  ['setupScreen','waitScreen','roleScreen','doneScreen'].forEach(id => show(id,false));
+  ['gameHdr','statusBar','mainArea','poolArea'].forEach(id => show(id,true));
+  document.body.classList.add('game');
+}
+
+function hideGame() {
+  ['gameHdr','statusBar','mainArea','poolArea'].forEach(id => show(id,false));
+  document.body.classList.remove('game');
+}
+
+socket.on('state', s => {
+  S = s;
+  if (!myRole) return;
+  render(s);
+});
+
+function render(s) {
+  if (s.phase === 'setup') {
+    hideGame();
+    if (myRole === 'team1') { show('setupScreen',true); show('waitScreen',false); }
+    else { show('waitScreen',true); show('setupScreen',false); }
+    show('doneScreen',false);
+    show('sideOverlay',false);
+    return;
+  }
+  if (s.phase === 'done') {
+    hideGame();
+    show('doneScreen',true);
+    show('sideOverlay',false);
+    renderResults(s);
+    return;
+  }
+  showGame();
+  show('doneScreen',false);
+
+  // Header
+  document.getElementById('hdrVs').textContent = s.team1.name + '  vs  ' + s.team2.name;
+  document.getElementById('t1hdr').textContent = s.team1.name;
+  document.getElementById('t2hdr').textContent = s.team2.name;
+
+  // Highlight active team header
+  const step = VETO[s.step];
+  document.getElementById('t1hdr').className = 'team-hdr' + (step && step.team==='team1' && s.phase==='veto' ? ' active-turn' : '');
+  document.getElementById('t2hdr').className = 'team-hdr right' + (step && step.team==='team2' && s.phase==='veto' ? ' active-turn' : '');
+
+  // Status
+  let statusTxt = '等待中...';
+  if (s.phase === 'veto' && step) {
+    const tname = s[step.team].name;
+    statusTxt = `${tname} 正在 ${step.action==='ban'?'禁用':'選擇'} 地圖`;
+    if (myRole === step.team) statusTxt = '👆 ' + statusTxt + ' (請點選)';
+  } else if (s.phase === 'side') {
+    statusTxt = s[s.sideBy].name + ' 正在選擇攻守方 (第' + s.sideGame + '局)';
+  }
+  document.getElementById('statusPill').textContent = statusTxt;
+
+  // Side overlay
+  if (s.phase === 'side') {
+    const g = s.games.find(x => x.game === s.sideGame);
+    document.getElementById('sideMapName').textContent = g ? g.name : '';
+    document.getElementById('sidePrompt').textContent = s[s.sideBy].name + ' 請選擇第' + s.sideGame + '局攻守方';
+    const btns = document.getElementById('sideBtns');
+    if (myRole === s.sideBy) {
+      btns.innerHTML = `<button class="sbtn atk2" onclick="chooseSide('attack')">先攻</button><button class="sbtn def2" onclick="chooseSide('defense')">先守</button>`;
+    } else {
+      btns.innerHTML = `<p style="color:rgba(255,255,255,.4);font-family:'Noto Sans TC',sans-serif;font-size:.85rem">等待對方選擇...</p>`;
+    }
+    show('sideOverlay', true);
+  } else {
+    show('sideOverlay', false);
+  }
+
+  // Bans
+  renderBans(s);
+  // Picks
+  renderPicks(s);
+  // Map grid
+  renderGrid(s);
+  // Pool
+  renderPool(s);
+}
+
+function chooseSide(side) {
+  socket.emit('side', side);
+}
+
+function renderBans(s) {
+  ['team1','team2'].forEach(t => {
+    const el = document.getElementById(t === 'team1' ? 't1bans' : 't2bans');
+    el.innerHTML = '';
+    const bans = s[t].bans || [];
+    for (let i = 0; i < 2; i++) {
+      const mid = bans[i];
+      if (mid) {
+        const m = s.maps.find(x => x.id === mid);
+        el.innerHTML += `<div class="map-mini banned"><img src="${m.image}"><div class="mn">${m.name}</div></div>`;
+      } else {
+        el.innerHTML += `<div class="map-mini" style="border-style:dashed;border-color:rgba(255,255,255,.08);background:rgba(255,255,255,.02)"></div>`;
+      }
+    }
+  });
+}
+
+function renderPicks(s) {
+  ['team1','team2'].forEach(t => {
+    const el = document.getElementById(t === 'team1' ? 't1pick' : 't2pick');
+    const pid = s[t].pick;
+    if (pid) {
+      const m = s.maps.find(x => x.id === pid);
+      const g = s.games.find(x => x.mapId === pid);
+      const sideStr = g && g.side ? `<span class="side-tag ${g.side==='attack'?'atk':'def'}">${g.side==='attack'?'先攻':'先守'}</span>` : '';
+      el.className = 'pick-card';
+      el.innerHTML = `<img src="${m.image}"><div class="pn">${m.name}</div>${sideStr}`;
+    } else {
+      el.className = 'pick-card empty';
+      el.innerHTML = '';
+    }
+  });
+}
+
+function renderGrid(s) {
+  const grid = document.getElementById('mapGrid');
+  const step = VETO[s.step];
+  const canAct = s.phase === 'veto' && step && step.team === myRole;
+  grid.innerHTML = '';
+  s.maps.forEach(m => {
+    const div = document.createElement('div');
+    let cls = 'mc ' + (m.status !== 'available' ? m.status : '');
+    if (m.status === 'available' && canAct) cls += ' clickable ' + (step.action === 'ban' ? 'ban-action' : 'pick-action');
+    div.className = cls.trim();
+    div.innerHTML = `<img src="${m.image}" alt="${m.name}"><div class="mn">${m.name}</div>`;
+    if (m.status === 'available' && canAct) div.onclick = () => socket.emit('act', m.id);
+    grid.appendChild(div);
+  });
+}
+
+function renderPool(s) {
+  const row = document.getElementById('poolRow');
+  row.innerHTML = '';
+  s.maps.forEach(m => {
+    const cls = m.status === 'available' ? 'av' : m.status === 'banned' ? 'bn' : m.status === 'picked' ? 'pk' : 'dc';
+    row.innerHTML += `<div class="pm ${cls}"><img src="${m.image}"><div class="pn2">${m.name}</div></div>`;
+  });
+}
+
+function renderResults(s) {
+  const box = document.getElementById('resultsBox');
+  box.innerHTML = s.games.map(g => {
+    const sideStr = g.side ? (g.sideBy === 'team1' ?
+      `${s.team1.name} ${g.side==='attack'?'先攻':'先守'}` :
+      `${s.team2.name} ${g.side==='attack'?'先攻':'先守'}`) : '攻守待定';
+    return `<div style="border:1px solid rgba(201,162,39,.3);border-radius:6px;padding:14px 24px">
+      <div style="color:#c9a227;font-size:.7rem;letter-spacing:3px">第 ${g.game} 局 ${g.pickedBy==='decider'?'(決定圖)':''}</div>
+      <div style="font-size:1.4rem;font-weight:700;margin:4px 0">${g.name}</div>
+      <div style="font-size:.8rem;color:rgba(255,255,255,.5)">${sideStr}</div>
+    </div>`;
+  }).join('');
+}
+</script>
+</body>
+</html>

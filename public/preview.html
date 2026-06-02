@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>MAP VETO - Preview</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700;900&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden}
+
+/* Body = vertical grid with exact row sizes */
+body{
+  background:#08080f;
+  color:#fff;
+  font-family:'Rajdhani',sans-serif;
+  display:grid;
+  grid-template-rows:76px 22px 1fr 78px;
+  height:100vh;
+}
+
+/* BG decorations */
+.bg{position:fixed;inset:0;background:radial-gradient(ellipse 100% 55% at 50% -5%,#1e1a09 0%,#08080f 55%);z-index:0;pointer-events:none}
+.bg-grid{position:fixed;inset:0;background-image:linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);background-size:55px 55px;z-index:0;pointer-events:none}
+.glow-l{position:fixed;left:-120px;top:50%;transform:translateY(-50%);width:350px;height:350px;background:radial-gradient(circle,rgba(201,162,39,.11),transparent 70%);z-index:0;pointer-events:none}
+.glow-r{position:fixed;right:-120px;top:50%;transform:translateY(-50%);width:350px;height:350px;background:radial-gradient(circle,rgba(40,100,255,.07),transparent 70%);z-index:0;pointer-events:none}
+.line-t{position:fixed;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#c9a227 30%,#f0d060 50%,#c9a227 70%,transparent);z-index:10}
+.line-b{position:fixed;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#c9a227 30%,#f0d060 50%,#c9a227 70%,transparent);z-index:10}
+
+/* ROW 1: HEADER */
+.hdr{position:relative;z-index:2;text-align:center;display:flex;flex-direction:column;justify-content:center;padding:8px 0 4px}
+.hdr-title{font-size:clamp(1.7rem,3.5vw,2.8rem);font-weight:900;letter-spacing:10px;text-transform:uppercase;background:linear-gradient(180deg,#fff 25%,#c9a227 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1}
+.hdr-sub{font-size:.6rem;letter-spacing:6px;color:#c9a227;text-transform:uppercase;margin-top:2px}
+.hdr-vs{font-size:.72rem;letter-spacing:3px;color:rgba(255,255,255,.4);margin-top:1px}
+.hdr-vs b{color:#c9a227}
+
+/* ROW 2: STATUS */
+.status{position:relative;z-index:2;display:flex;align-items:center;justify-content:center}
+.status-pill{display:inline-block;padding:3px 20px;background:rgba(201,162,39,.1);border:1px solid rgba(201,162,39,.25);border-radius:20px;color:#c9a227;font-size:.68rem;letter-spacing:3px;font-family:'Noto Sans TC',sans-serif}
+
+/* ROW 3: MAIN (2 team panels) */
+.main{
+  position:relative;z-index:2;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  padding:4px 14px 4px;
+  overflow:hidden;
+  min-height:0;
+}
+
+/* Each team column: vertical grid */
+.col{
+  display:grid;
+  /* team header | ban label | bans | pick label | pick fills */
+  grid-template-rows:auto auto 14vh auto 1fr;
+  gap:4px;
+  overflow:hidden;
+  min-height:0;
+}
+
+/* TEAM HEADER */
+.t-hdr{display:flex;align-items:center;gap:9px;padding:6px 12px;background:linear-gradient(135deg,rgba(201,162,39,.12),rgba(201,162,39,.03));border:1px solid rgba(201,162,39,.28);border-radius:5px}
+.t-hdr.r{flex-direction:row-reverse}
+.t-logo{width:36px;height:36px;border-radius:50%;border:2px solid #c9a227;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;background:rgba(0,0,0,.5)}
+.t-name{font-size:clamp(.85rem,1.7vw,1.3rem);font-weight:700;letter-spacing:3px;text-transform:uppercase;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.t-hdr.r .t-name{text-align:right}
+.side-pill{padding:2px 9px;border-radius:3px;font-size:.6rem;letter-spacing:2px;font-weight:700;flex-shrink:0}
+.atk{background:rgba(255,80,40,.2);border:1px solid #ff5028;color:#ff6040}
+.def{background:rgba(40,140,255,.2);border:1px solid #288cff;color:#50a0ff}
+
+/* SECTION LABEL */
+.sec-lbl{font-size:.52rem;letter-spacing:4px;color:rgba(255,255,255,.3);text-transform:uppercase}
+
+/* BAN CARDS row */
+.bans-row{display:grid;grid-template-columns:1fr 1fr;gap:4px;height:100%}
+.mc{position:relative;border-radius:4px;overflow:hidden;background:#0e0e16;border:1px solid rgba(255,255,255,.07)}
+.mc img{width:100%;height:100%;object-fit:cover;display:block}
+.mc .mlbl{position:absolute;bottom:0;left:0;right:0;padding:3px 6px;background:linear-gradient(transparent,rgba(0,0,0,.9));font-size:.6rem;letter-spacing:1px;font-family:'Noto Sans TC',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mc.bn img{filter:brightness(.25) saturate(.1)}
+.mc.bn::after{content:'✕';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:min(2rem,5vw);font-weight:900;color:rgba(230,50,50,.95);text-shadow:0 0 15px rgba(230,50,50,.5)}
+.mc.bn{border-color:rgba(200,50,50,.3)}
+.mc.emp{border:1px dashed rgba(255,255,255,.08);background:rgba(255,255,255,.02)}
+
+/* PICK CARD — fills remaining space in col */
+.pc{position:relative;border-radius:5px;overflow:hidden;background:#0e0e16;border:2px solid rgba(201,162,39,.12)}
+.pc img{width:100%;height:100%;object-fit:cover;display:block;filter:brightness(.75)}
+.pc .plbl{position:absolute;bottom:0;left:0;right:0;padding:6px 11px;background:linear-gradient(transparent,rgba(0,0,0,.92));font-size:clamp(.68rem,1.2vw,.88rem);letter-spacing:2px;font-family:'Noto Sans TC',sans-serif}
+.pc.on{border-color:rgba(201,162,39,.7);box-shadow:0 0 14px rgba(201,162,39,.14)}
+.pc-badge{position:absolute;top:7px;left:7px;background:#c9a227;color:#000;padding:2px 8px;font-size:.55rem;letter-spacing:2px;border-radius:2px;font-weight:700;z-index:2;text-transform:uppercase}
+.pc.emp{display:flex;align-items:center;justify-content:center;border-style:dashed;border-color:rgba(255,255,255,.06)}
+.pc.emp::after{content:'等待選圖...';color:rgba(255,255,255,.15);font-size:.68rem;letter-spacing:3px;font-family:'Noto Sans TC',sans-serif}
+
+/* ROW 4: MAP POOL */
+.pool{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 14px 6px}
+.pool-lbl{font-size:.52rem;letter-spacing:6px;color:rgba(255,255,255,.26);text-transform:uppercase;margin-bottom:5px}
+.pool-row{display:flex;gap:5px;justify-content:center}
+.pm{position:relative;width:clamp(65px,7vw,95px);aspect-ratio:16/10;border-radius:4px;overflow:hidden;flex-shrink:0}
+.pm img{width:100%;height:100%;object-fit:cover;display:block}
+.pm .pn{position:absolute;bottom:0;left:0;right:0;padding:2px 4px;background:linear-gradient(transparent,rgba(0,0,0,.92));font-size:.52rem;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:'Noto Sans TC',sans-serif}
+.pm.av{border:1px solid rgba(255,255,255,.17)}
+.pm.bn{border:1px solid rgba(200,50,50,.22);opacity:.38}
+.pm.bn img{filter:brightness(.2) saturate(0)}
+.pm.bn::after{content:'✕';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1.2rem;color:rgba(230,50,50,.9);font-weight:900}
+.pm.pk{border:2px solid rgba(201,162,39,.72);box-shadow:0 0 8px rgba(201,162,39,.18)}
+.pm.dc{border:2px solid rgba(80,200,255,.78);box-shadow:0 0 10px rgba(80,200,255,.22)}
+.pm-mk{position:absolute;top:3px;left:3px;width:13px;height:13px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.48rem;font-weight:700;z-index:2}
+.mk1{background:#ff5028;color:#fff}
+.mk2{background:#288cff;color:#fff}
+.dc-tag{position:absolute;top:3px;left:3px;background:rgba(80,200,255,.9);color:#000;padding:1px 4px;font-size:.44rem;letter-spacing:1px;border-radius:2px;font-weight:700;z-index:2;text-transform:uppercase}
+
+@keyframes fi{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+.anim{animation:fi .4s ease}
+</style>
+</head>
+<body>
+<div class="bg"></div><div class="bg-grid"></div>
+<div class="glow-l"></div><div class="glow-r"></div>
+<div class="line-t"></div><div class="line-b"></div>
+
+<!-- ROW 1: HEADER -->
+<div class="hdr">
+  <div class="hdr-title">MAP VETO</div>
+  <div class="hdr-sub">Rainbow Six Siege · 比賽禁圖</div>
+  <div class="hdr-vs">ALPHA TEAM &nbsp;<b>VS</b>&nbsp; BRAVO TEAM</div>
+</div>
+
+<!-- ROW 2: STATUS -->
+<div class="status">
+  <div class="status-pill">🔴 ALPHA TEAM 正在禁用地圖... (第 3 / 6 步)</div>
+</div>
+
+<!-- ROW 3: MAIN AREA -->
+<div class="main">
+  <!-- TEAM 1 -->
+  <div class="col">
+    <div class="t-hdr">
+      <div class="t-logo">🔴</div>
+      <div class="t-name">ALPHA TEAM</div>
+      <div class="side-pill atk">先攻</div>
+    </div>
+    <div class="sec-lbl">禁用地圖</div>
+    <div class="bans-row">
+      <div class="mc bn anim"><img src="../銀行.avif" alt="銀行"><div class="mlbl">銀行</div></div>
+      <div class="mc bn anim"><img src="../俱樂部.avif" alt="俱樂部"><div class="mlbl">俱樂部</div></div>
+    </div>
+    <div class="sec-lbl">選擇地圖</div>
+    <div class="pc on anim">
+      <div class="pc-badge">PICKED</div>
+      <img src="../荒漠.avif" alt="荒漠">
+      <div class="plbl">荒漠</div>
+    </div>
+  </div>
+
+  <!-- TEAM 2 -->
+  <div class="col">
+    <div class="t-hdr r">
+      <div class="t-logo">🔵</div>
+      <div class="t-name">BRAVO TEAM</div>
+      <div class="side-pill def">先守</div>
+    </div>
+    <div class="sec-lbl" style="text-align:right">禁用地圖</div>
+    <div class="bans-row">
+      <div class="mc bn anim"><img src="../邊境.avif" alt="邊境"><div class="mlbl">邊境</div></div>
+      <div class="mc emp"></div>
+    </div>
+    <div class="sec-lbl" style="text-align:right">選擇地圖</div>
+    <div class="pc on anim">
+      <div class="pc-badge">PICKED</div>
+      <img src="../木屋.avif" alt="木屋">
+      <div class="plbl">木屋</div>
+    </div>
+  </div>
+</div>
+
+<!-- ROW 4: MAP POOL -->
+<div class="pool">
+  <div class="pool-lbl">地圖池 MAP POOL</div>
+  <div class="pool-row">
+    <div class="pm bn"><img src="../銀行.avif" alt="銀行"><div class="pm-mk mk1">1</div><div class="pn">銀行</div></div>
+    <div class="pm bn"><img src="../俱樂部.avif" alt="俱樂部"><div class="pm-mk mk1">1</div><div class="pn">俱樂部</div></div>
+    <div class="pm bn"><img src="../邊境.avif" alt="邊境"><div class="pm-mk mk2">2</div><div class="pn">邊境</div></div>
+    <div class="pm pk"><img src="../荒漠.avif" alt="荒漠"><div class="pm-mk mk1">1</div><div class="pn">荒漠</div></div>
+    <div class="pm pk"><img src="../木屋.avif" alt="木屋"><div class="pm-mk mk2">2</div><div class="pn">木屋</div></div>
+    <div class="pm av"><img src="../別墅.jpg" alt="別墅"><div class="pn">別墅</div></div>
+    <div class="pm av"><img src="../奧勒岡鄉間屋宅.jpg" alt="奧勒岡"><div class="pn">奧勒岡</div></div>
+    <div class="pm dc"><img src="../杜斯妥也夫斯基咖啡館.avif" alt="咖啡館"><div class="dc-tag">DECIDER</div><div class="pn">咖啡館</div></div>
+  </div>
+</div>
+</body>
+</html>

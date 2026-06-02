@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管理員控制台 - R6 Map Veto</title>
+<script src="/socket.io/socket.io.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0d0d14;color:#fff;font-family:'Rajdhani',sans-serif;min-height:100vh}
+.admin-wrap{max-width:1000px;margin:0 auto;padding:20px}
+h1{font-size:1.8rem;letter-spacing:5px;color:#c9a227;text-transform:uppercase;margin-bottom:4px}
+.subtitle{font-size:0.75rem;color:rgba(255,255,255,0.4);letter-spacing:3px;margin-bottom:20px}
+/* Login */
+#loginPanel{background:rgba(255,255,255,0.04);border:1px solid rgba(201,162,39,0.3);border-radius:8px;padding:30px;text-align:center;max-width:400px;margin:60px auto}
+#loginPanel h2{color:#c9a227;letter-spacing:4px;margin-bottom:20px}
+.input-row{display:flex;gap:10px;justify-content:center}
+input[type=text],input[type=password]{background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);color:#fff;padding:10px 16px;border-radius:4px;font-size:0.95rem;width:200px;font-family:'Noto Sans TC',sans-serif}
+input:focus{outline:none;border-color:#c9a227}
+btn,button{cursor:pointer;border:none;padding:10px 20px;border-radius:4px;font-family:'Rajdhani',sans-serif;font-size:0.95rem;letter-spacing:2px;font-weight:700;text-transform:uppercase;transition:all .2s}
+.btn-gold{background:linear-gradient(135deg,#c9a227,#e8c84a);color:#000}
+.btn-gold:hover{background:linear-gradient(135deg,#e8c84a,#c9a227);transform:translateY(-1px)}
+.btn-danger{background:rgba(220,50,50,0.2);border:1px solid rgba(220,50,50,0.5);color:#f87171}
+.btn-danger:hover{background:rgba(220,50,50,0.35)}
+.btn-blue{background:rgba(50,150,255,0.2);border:1px solid rgba(50,150,255,0.5);color:#60a5fa}
+.btn-blue:hover{background:rgba(50,150,255,0.35)}
+.btn-sm{padding:6px 14px;font-size:0.8rem}
+/* Control panel */
+#controlPanel{display:none}
+.panel{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:18px;margin-bottom:16px}
+.panel h3{font-size:0.85rem;letter-spacing:4px;color:#c9a227;text-transform:uppercase;margin-bottom:14px;border-bottom:1px solid rgba(201,162,39,0.2);padding-bottom:8px}
+.setup-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.setup-row label{font-size:0.8rem;color:rgba(255,255,255,0.5);letter-spacing:2px;margin-bottom:4px;display:block}
+.setup-row .field{display:flex;flex-direction:column}
+/* Step indicator */
+.step-bar{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.step{padding:4px 12px;border-radius:20px;font-size:0.7rem;letter-spacing:2px;border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.3)}
+.step.active{background:rgba(201,162,39,0.2);border-color:#c9a227;color:#c9a227}
+.step.done{background:rgba(50,200,100,0.1);border-color:rgba(50,200,100,0.4);color:#4ade80}
+/* Map grid */
+.map-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.map-btn{position:relative;border-radius:6px;overflow:hidden;aspect-ratio:16/10;cursor:pointer;border:2px solid rgba(255,255,255,0.1);transition:all .25s;background:#111}
+.map-btn img{width:100%;height:100%;object-fit:cover;filter:brightness(0.7);transition:filter .2s}
+.map-btn .map-btn-label{position:absolute;bottom:0;left:0;right:0;padding:6px 8px;background:linear-gradient(transparent,rgba(0,0,0,0.9));font-size:0.75rem;font-family:'Noto Sans TC',sans-serif}
+.map-btn:not(.disabled):hover{border-color:#c9a227;transform:scale(1.03)}
+.map-btn:not(.disabled):hover img{filter:brightness(0.9)}
+.map-btn.action-ban:not(.disabled){border-color:rgba(220,80,80,0.6)}
+.map-btn.action-pick:not(.disabled){border-color:rgba(100,220,100,0.6)}
+.map-btn.disabled{opacity:0.4;cursor:not-allowed}
+.map-btn.banned{opacity:0.35;cursor:not-allowed}
+.map-btn.banned img{filter:brightness(0.2) saturate(0)}
+.map-btn.banned::after{content:'BANNED';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.9rem;color:rgba(220,80,80,0.9);letter-spacing:2px;font-weight:700}
+.map-btn.picked{border-color:rgba(201,162,39,0.8);cursor:not-allowed}
+.map-btn.picked::before{content:'PICKED';position:absolute;top:6px;left:6px;background:#c9a227;color:#000;padding:2px 8px;font-size:0.6rem;letter-spacing:2px;border-radius:2px;font-weight:700;z-index:2}
+.map-btn.decider{border-color:rgba(100,200,255,0.8);cursor:not-allowed}
+/* Side selection */
+.side-btns{display:flex;gap:12px;flex-wrap:wrap}
+.btn-attack{background:rgba(255,100,50,0.2);border:2px solid rgba(255,100,50,0.6);color:#ff6432;padding:10px 24px;border-radius:4px;font-size:0.9rem;letter-spacing:2px;cursor:pointer;transition:all .2s;font-family:'Rajdhani',sans-serif;font-weight:700}
+.btn-attack:hover{background:rgba(255,100,50,0.4)}
+.btn-defense{background:rgba(50,150,255,0.2);border:2px solid rgba(50,150,255,0.6);color:#3296ff;padding:10px 24px;border-radius:4px;font-size:0.9rem;letter-spacing:2px;cursor:pointer;transition:all .2s;font-family:'Rajdhani',sans-serif;font-weight:700}
+.btn-defense:hover{background:rgba(50,150,255,0.4)}
+/* Status */
+.status-chip{display:inline-block;padding:4px 12px;border-radius:20px;font-size:0.75rem;letter-spacing:2px;margin-bottom:10px}
+.chip-veto{background:rgba(201,162,39,0.15);border:1px solid rgba(201,162,39,0.4);color:#c9a227}
+.chip-done{background:rgba(50,200,100,0.1);border:1px solid rgba(50,200,100,0.4);color:#4ade80}
+.chip-setup{background:rgba(100,100,100,0.15);border:1px solid rgba(100,100,100,0.3);color:rgba(255,255,255,0.5)}
+.info-text{font-size:0.8rem;color:rgba(255,255,255,0.5);letter-spacing:1px;font-family:'Noto Sans TC',sans-serif;line-height:1.6;margin-top:8px}
+.current-action{padding:10px 16px;background:rgba(201,162,39,0.1);border:1px solid rgba(201,162,39,0.3);border-radius:4px;margin-bottom:12px;font-size:0.85rem;letter-spacing:2px;color:#c9a227;font-family:'Noto Sans TC',sans-serif}
+/* Log */
+.log-list{max-height:120px;overflow-y:auto;font-size:0.75rem;font-family:'Noto Sans TC',sans-serif;line-height:1.8;color:rgba(255,255,255,0.6)}
+.log-list::-webkit-scrollbar{width:4px}
+.log-list::-webkit-scrollbar-thumb{background:rgba(201,162,39,0.3);border-radius:2px}
+.err{color:#f87171;margin-top:8px;font-size:0.8rem;font-family:'Noto Sans TC',sans-serif}
+</style>
+</head>
+<body>
+<div class="admin-wrap">
+  <h1>🎮 管理員控制台</h1>
+  <div class="subtitle">R6 MAP VETO ADMIN PANEL · 密碼: admin123</div>
+
+  <!-- Login -->
+  <div id="loginPanel">
+    <h2>管理員登入</h2>
+    <div class="input-row">
+      <input type="password" id="pwInput" placeholder="輸入密碼" onkeydown="if(event.key==='Enter')doLogin()">
+      <button class="btn-gold" onclick="doLogin()">登入</button>
+    </div>
+    <div class="err" id="loginErr"></div>
+  </div>
+
+  <!-- Control panel -->
+  <div id="controlPanel">
+    <!-- Setup -->
+    <div class="panel" id="setupPanel">
+      <h3>⚙️ 隊伍設置</h3>
+      <div class="setup-row">
+        <div class="field">
+          <label>隊伍 1 名稱</label>
+          <input type="text" id="team1Input" placeholder="TEAM 1" value="TEAM 1">
+        </div>
+        <div class="field">
+          <label>隊伍 2 名稱</label>
+          <input type="text" id="team2Input" placeholder="TEAM 2" value="TEAM 2">
+        </div>
+        <button class="btn-gold" style="margin-top:18px" onclick="startGame()">🚀 開始比賽</button>
+        <button class="btn-danger btn-sm" style="margin-top:18px" onclick="resetGame()">🔄 重置</button>
+      </div>
+    </div>
+
+    <!-- Current status -->
+    <div class="panel" id="vetoPanel">
+      <h3>📋 禁圖流程</h3>
+      <div class="step-bar" id="stepBar"></div>
+      <div class="current-action" id="currentAction">等待比賽開始...</div>
+      <!-- Map selection grid -->
+      <div class="map-grid" id="mapGrid"></div>
+    </div>
+
+    <!-- Side selection -->
+    <div class="panel" id="sidePanel" style="display:none">
+      <h3>⚔️ 選擇攻守方（決定圖）</h3>
+      <div class="info-text" id="sideInfo">請選擇哪支隊伍先攻</div>
+      <div class="side-btns" style="margin-top:12px" id="sideBtns"></div>
+    </div>
+
+    <!-- Log -->
+    <div class="panel">
+      <h3>📝 操作記錄</h3>
+      <div class="log-list" id="logList"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const socket = io();
+let state = null;
+let isAdmin = false;
+
+const VETO_ORDER = [
+  {action:'ban',team:'team1',label:'禁用'},{action:'ban',team:'team2',label:'禁用'},
+  {action:'ban',team:'team1',label:'禁用'},{action:'ban',team:'team2',label:'禁用'},
+  {action:'pick',team:'team1',label:'選擇'},{action:'pick',team:'team2',label:'選擇'},
+];
+
+function doLogin() {
+  const pw = document.getElementById('pwInput').value;
+  socket.emit('adminJoin', pw);
+}
+
+socket.on('adminAuth', (ok) => {
+  if (ok) {
+    document.getElementById('loginPanel').style.display = 'none';
+    document.getElementById('controlPanel').style.display = 'block';
+    isAdmin = true;
+  } else {
+    document.getElementById('loginErr').textContent = '密碼錯誤！';
+  }
+});
+
+function startGame() {
+  const t1 = document.getElementById('team1Input').value.trim() || 'TEAM 1';
+  const t2 = document.getElementById('team2Input').value.trim() || 'TEAM 2';
+  socket.emit('setupTeams', { team1Name: t1, team2Name: t2 });
+}
+
+function resetGame() {
+  if (confirm('確定要重置比賽嗎？')) socket.emit('resetGame');
+}
+
+function doVeto(mapId) {
+  socket.emit('vetoAction', mapId);
+}
+
+function selectSide(team, side) {
+  socket.emit('selectSide', { team, side });
+}
+
+function renderStepBar(s) {
+  const bar = document.getElementById('stepBar');
+  bar.innerHTML = VETO_ORDER.map((step, i) => {
+    const tName = s[step.team].name;
+    let cls = 'step';
+    if (i < s.vetoStep) cls += ' done';
+    else if (i === s.vetoStep) cls += ' active';
+    return `<div class="${cls}">${i+1}. ${tName} ${step.label}</div>`;
+  }).join('');
+}
+
+function renderMapGrid(s) {
+  const grid = document.getElementById('mapGrid');
+  const step = VETO_ORDER[s.vetoStep];
+  grid.innerHTML = '';
+  s.maps.forEach(map => {
+    const btn = document.createElement('div');
+    const isAvailable = map.status === 'available';
+    const canClick = isAvailable && step && s.phase === 'veto';
+    btn.className = `map-btn ${map.status}${!isAvailable ? ' disabled' : ''} ${canClick ? ('action-' + step.action) : ''}`;
+    btn.innerHTML = `<img src="${map.image}" alt="${map.name}"><div class="map-btn-label">${map.name}</div>`;
+    if (canClick) btn.onclick = () => doVeto(map.id);
+    grid.appendChild(btn);
+  });
+}
+
+function renderSidePanel(s) {
+  const panel = document.getElementById('sidePanel');
+  const btns = document.getElementById('sideBtns');
+  if (s.phase === 'sideSelect') {
+    panel.style.display = '';
+    const decMap = s.maps.find(m => m.id === s.decider);
+    document.getElementById('sideInfo').textContent = `決定圖: ${decMap ? decMap.name : ''} — 哪隊先攻？`;
+    btns.innerHTML = `
+      <button class="btn-attack" onclick="selectSide('team1','attack')">${s.team1.name} 先攻</button>
+      <button class="btn-defense" onclick="selectSide('team1','defense')">${s.team1.name} 先守</button>`;
+  } else if (s.phase === 'done') {
+    panel.style.display = '';
+    document.getElementById('sideInfo').textContent = `✅ 設置完成！${s.team1.name} [${s.team1.side === 'attack' ? '先攻' : '先守'}] vs ${s.team2.name} [${s.team2.side === 'attack' ? '先攻' : '先守'}]`;
+    btns.innerHTML = `<button class="btn-danger btn-sm" onclick="resetGame()">🔄 重置比賽</button>`;
+  } else {
+    panel.style.display = 'none';
+  }
+}
+
+function renderCurrentAction(s) {
+  const el = document.getElementById('currentAction');
+  if (s.phase === 'setup') { el.textContent = '請填寫隊伍名稱並開始比賽'; return; }
+  if (s.phase === 'done') { el.textContent = '✅ 禁圖流程完成！'; return; }
+  if (s.phase === 'sideSelect') { el.textContent = '⚡ 請選擇決定圖攻守方！'; return; }
+  const step = VETO_ORDER[s.vetoStep];
+  if (!step) { el.textContent = '計算決定圖...'; return; }
+  el.textContent = `👆 輪到 ${s[step.team].name} ${step.action === 'ban' ? '禁用' : '選擇'} 地圖`;
+}
+
+function renderLog(s) {
+  const list = document.getElementById('logList');
+  list.innerHTML = [...s.logs].reverse().map(l => `<div>[${l.time}] ${l.msg}</div>`).join('');
+}
+
+socket.on('stateUpdate', (s) => {
+  state = s;
+  if (!isAdmin) return;
+  document.getElementById('team1Input').value = s.team1.name;
+  document.getElementById('team2Input').value = s.team2.name;
+  renderStepBar(s);
+  renderCurrentAction(s);
+  renderMapGrid(s);
+  renderSidePanel(s);
+  renderLog(s);
+});
+</script>
+</body>
+</html>
