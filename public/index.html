@@ -211,16 +211,7 @@ let S = null;
 function pickRole(r) {
   myRole = r;
   show('roleScreen', false);
-  if (r === 'team1') {
-    if (S && S.phase !== 'setup') { showGame(); }
-    else show('setupScreen', true);
-  } else if (r === 'team2') {
-    if (S && S.phase !== 'setup') showGame();
-    else show('waitScreen', true);
-  } else {
-    if (S && S.phase !== 'setup') showGame();
-    else show('waitScreen', true);
-  }
+  if (S) render(S);
 }
 
 function show(id, visible) {
