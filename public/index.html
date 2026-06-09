@@ -109,8 +109,8 @@ body.game{display:grid;grid-template-rows:70px 26px 1fr 90px;overflow:hidden}
   <div class="logo">MAP VETO</div>
   <div class="sub">Rainbow Six Siege · BO3</div>
   <div class="row" style="margin-top:10px">
-    <button class="btn red" onclick="pickRole('team1')">🔴 隊伍 1 代表</button>
-    <button class="btn blue" onclick="pickRole('team2')">🔵 隊伍 2 代表</button>
+    <button class="btn red" onclick="pickRole('team1')">🔴 A 隊代表</button>
+    <button class="btn blue" onclick="pickRole('team2')">🔵 B 隊代表</button>
     <button class="btn" onclick="pickRole('viewer')">👁 觀看</button>
   </div>
 </div>
@@ -120,8 +120,8 @@ body.game{display:grid;grid-template-rows:70px 26px 1fr 90px;overflow:hidden}
   <div class="logo">MAP VETO</div>
   <div class="sub">設置隊伍名稱</div>
   <div class="row">
-    <div class="field"><label>隊伍 1 名稱</label><input id="t1name" value="TEAM 1"></div>
-    <div class="field"><label>隊伍 2 名稱</label><input id="t2name" value="TEAM 2"></div>
+    <div class="field"><label>A 隊名稱</label><input id="t1name" value="A 隊"></div>
+    <div class="field"><label>B 隊名稱</label><input id="t2name" value="B 隊"></div>
   </div>
   <button class="btn gold" onclick="startGame()">🚀 開始比賽</button>
 </div>
@@ -130,7 +130,7 @@ body.game{display:grid;grid-template-rows:70px 26px 1fr 90px;overflow:hidden}
 <div class="screen hidden" id="waitScreen">
   <div class="logo">MAP VETO</div>
   <div class="sub">等待比賽開始...</div>
-  <p style="color:rgba(255,255,255,.3);font-size:.8rem;font-family:'Noto Sans TC',sans-serif">等待隊伍1代表設置並開始</p>
+  <p style="color:rgba(255,255,255,.3);font-size:.8rem;font-family:'Noto Sans TC',sans-serif">等待A隊代表設置並開始</p>
 </div>
 
 <!-- SIDE SELECT OVERLAY -->
@@ -179,7 +179,7 @@ body.game{display:grid;grid-template-rows:70px 26px 1fr 90px;overflow:hidden}
 <div class="main hidden" id="mainArea">
   <!-- Team 1 left -->
   <div class="team-col">
-    <div class="team-hdr" id="t1hdr">TEAM 1</div>
+    <div class="team-hdr" id="t1hdr">A 隊</div>
     <div class="side-lbl">禁用地圖</div>
     <div class="ban-list" id="t1bans"></div>
     <div class="side-lbl" style="margin-top:4px">選擇地圖</div>
@@ -191,7 +191,7 @@ body.game{display:grid;grid-template-rows:70px 26px 1fr 90px;overflow:hidden}
   </div>
   <!-- Team 2 right -->
   <div class="team-col">
-    <div class="team-hdr right" id="t2hdr">TEAM 2</div>
+    <div class="team-hdr right" id="t2hdr">B 隊</div>
     <div class="side-lbl" style="text-align:right">禁用地圖</div>
     <div class="ban-list" id="t2bans"></div>
     <div class="side-lbl" style="text-align:right;margin-top:4px">選擇地圖</div>
@@ -222,8 +222,8 @@ function show(id, visible) {
 
 function startGame() {
   socket.emit('start', {
-    t1: document.getElementById('t1name').value.trim() || 'TEAM 1',
-    t2: document.getElementById('t2name').value.trim() || 'TEAM 2'
+    t1: document.getElementById('t1name').value.trim() || 'A 隊',
+    t2: document.getElementById('t2name').value.trim() || 'B 隊'
   });
 }
 

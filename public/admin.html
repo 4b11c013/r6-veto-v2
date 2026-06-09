@@ -96,12 +96,12 @@ btn,button{cursor:pointer;border:none;padding:10px 20px;border-radius:4px;font-f
       <h3>⚙️ 隊伍設置</h3>
       <div class="setup-row">
         <div class="field">
-          <label>隊伍 1 名稱</label>
-          <input type="text" id="team1Input" placeholder="TEAM 1" value="TEAM 1">
+          <label>A 隊名稱</label>
+          <input type="text" id="team1Input" placeholder="A 隊" value="A 隊">
         </div>
         <div class="field">
-          <label>隊伍 2 名稱</label>
-          <input type="text" id="team2Input" placeholder="TEAM 2" value="TEAM 2">
+          <label>B 隊名稱</label>
+          <input type="text" id="team2Input" placeholder="B 隊" value="B 隊">
         </div>
         <button class="btn-gold" style="margin-top:18px" onclick="startGame()">🚀 開始比賽</button>
         <button class="btn-danger btn-sm" style="margin-top:18px" onclick="resetGame()">🔄 重置</button>
@@ -159,8 +159,8 @@ socket.on('adminAuth', (ok) => {
 });
 
 function startGame() {
-  const t1 = document.getElementById('team1Input').value.trim() || 'TEAM 1';
-  const t2 = document.getElementById('team2Input').value.trim() || 'TEAM 2';
+  const t1 = document.getElementById('team1Input').value.trim() || 'A 隊';
+  const t2 = document.getElementById('team2Input').value.trim() || 'B 隊';
   socket.emit('setupTeams', { team1Name: t1, team2Name: t2 });
 }
 

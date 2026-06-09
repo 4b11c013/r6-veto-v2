@@ -37,8 +37,8 @@ function loadMaps() {
 function reset() {
   S = {
     phase: 'setup',       // setup | veto | side | done
-    team1: { name:'TEAM 1', bans:[], pick:null },
-    team2: { name:'TEAM 2', bans:[], pick:null },
+    team1: { name:'A 隊', bans:[], pick:null },
+    team2: { name:'B 隊', bans:[], pick:null },
     step: 0,
     maps: loadMaps(),
     decider: null,
@@ -56,8 +56,8 @@ io.on('connection', sock => {
 
   sock.on('start', ({t1, t2}) => {
     reset();
-    S.team1.name = t1 || 'TEAM 1';
-    S.team2.name = t2 || 'TEAM 2';
+    S.team1.name = t1 || 'A 隊';
+    S.team2.name = t2 || 'B 隊';
     S.phase = 'veto';
     S.dynamicVeto = [...VETO];
     io.emit('state', S);
